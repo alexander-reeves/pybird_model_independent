@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (C) 2024 ETH Zurich, Institute for Particle Physics and Astrophysics
+# Copyright (C) 2025 ETH Zurich, Institute for Particle Physics and Astrophysics
 # Author: Alexander Reeves
 """
 Cosmology-independent P(k) reconstruction for DESI 6-sky mock data.
