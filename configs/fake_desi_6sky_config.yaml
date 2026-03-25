@@ -1,0 +1,321 @@
+# PyBird likelihood template for DESI 6-sky mock analysis
+# (7 sky patches at 6 unique redshifts: BGS, LRG1, LRG2, ELG1, ELG2, QSO1, QSO2)
+#
+# data_file and data_path are overwritten at runtime by generate_fake_data.py / Fake class.
+# Do NOT edit those two fields manually.
+data_file: fake_desi_6sky.h5
+data_path: output/
+
+output: bPk
+multipole: 3
+eft_basis: eftoflss
+km: 0.7
+kr: 0.25
+
+with_ap: true
+with_binning: false
+with_emu: true
+with_loop_prior: false
+with_nnlo_counterterm: true
+with_redshift_bin: false
+with_resum: true
+with_stoch: true
+with_survey_mask: false
+with_wedge: false
+
+# 7 sky patches
+sky:
+  sky_1:
+    max:
+    - 0.2
+    - 0.2
+    - 0.2
+    min:
+    - 0.01
+    - 0.01
+    - 0.01
+    nd: 0.0003
+  sky_2:
+    max:
+    - 0.2
+    - 0.2
+    - 0.2
+    min:
+    - 0.01
+    - 0.01
+    - 0.01
+    nd: 0.0003
+  sky_3:
+    max:
+    - 0.2
+    - 0.2
+    - 0.2
+    min:
+    - 0.01
+    - 0.01
+    - 0.01
+    nd: 0.0003
+  sky_4:
+    max:
+    - 0.2
+    - 0.2
+    - 0.2
+    min:
+    - 0.01
+    - 0.01
+    - 0.01
+    nd: 0.0003
+  sky_5:
+    max:
+    - 0.2
+    - 0.2
+    - 0.2
+    min:
+    - 0.01
+    - 0.01
+    - 0.01
+    nd: 0.0003
+  sky_6:
+    max:
+    - 0.2
+    - 0.2
+    - 0.2
+    min:
+    - 0.01
+    - 0.01
+    - 0.01
+    nd: 0.002
+  sky_7:
+    max:
+    - 0.2
+    - 0.2
+    - 0.2
+    min:
+    - 0.01
+    - 0.01
+    - 0.01
+    nd: 0.0001
+
+eft_prior:
+  b1:
+    mean:
+    - 1.9542
+    - 1.9542
+    - 1.9542
+    - 1.9542
+    - 1.9542
+    - 1.9542
+    - 1.9542
+    range:
+    - 0.8944
+    - 0.8944
+    - 0.8944
+    - 0.8944
+    - 0.8944
+    - 0.8944
+    - 0.8944
+    type: flat
+  b2:
+    mean:
+    - 0.4173
+    - 0.4173
+    - 0.4173
+    - 0.4173
+    - 0.4173
+    - 0.4173
+    - 0.4173
+    range:
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    type: gauss
+  b3:
+    mean:
+    - -0.3686
+    - -0.3686
+    - -0.3686
+    - -0.3686
+    - -0.3686
+    - -0.3686
+    - -0.3686
+    range:
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    type: marg_gauss
+  b4:
+    mean:
+    - 0.4173
+    - 0.4173
+    - 0.4173
+    - 0.4173
+    - 0.4173
+    - 0.4173
+    - 0.4173
+    range:
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    type: gauss
+  cct:
+    mean:
+    - 0.1843
+    - 0.1843
+    - 0.1843
+    - 0.1843
+    - 0.1843
+    - 0.1843
+    - 0.1843
+    range:
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    type: marg_gauss
+  ce0:
+    mean:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    range:
+    - 2.0
+    - 2.0
+    - 2.0
+    - 2.0
+    - 2.0
+    - 2.0
+    - 2.0
+    type: marg_gauss
+  ce1:
+    mean:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    range:
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    type: marg_gauss
+  ce2:
+    mean:
+    - -1.6279
+    - -1.6279
+    - -1.6279
+    - -1.6279
+    - -1.6279
+    - -1.6279
+    - -1.6279
+    range:
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    type: marg_gauss
+  cr1:
+    mean:
+    - -0.8477
+    - -0.8477
+    - -0.8477
+    - -0.8477
+    - -0.8477
+    - -0.8477
+    - -0.8477
+    range:
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    type: marg_gauss
+  cr2:
+    mean:
+    - -0.8141
+    - -0.8141
+    - -0.8141
+    - -0.8141
+    - -0.8141
+    - -0.8141
+    - -0.8141
+    range:
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    type: marg_gauss
+  cr4:
+    mean:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    range:
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    type: marg_gauss
+  cr6:
+    mean:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    range:
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    - 5.0
+    type: marg_gauss
+
+write:
+  fake: false
+  plot: false
+  save: false
+  show: false
