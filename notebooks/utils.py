@@ -8,6 +8,7 @@ import numpy as np
 from pybird.jax_special import interp1d
 from scipy.special import legendre
 import jax.numpy as jnp
+from cosmopower_jax.cosmopower_jax import CosmoPowerJAX as CPJ
 
 
 # =============================================================================
@@ -117,3 +118,5 @@ def get_cov(kk, ipklin, b1, f1, Vs=3.e9, nbar=3.e-4):
                           legendre_ell_mesh)
     cov_diagonal = 2 * np.trapz(integrand, x=mu_arr, axis=-1)
     return np.block([[np.diag(cov_diagonal[i, j]) for i in range(3)] for j in range(3)])
+
+
