@@ -182,3 +182,7 @@ output/
 data/
 __pycache__/
 *.pyc
+
+# local-only: superseded material (moved, not deleted) and SLURM core dumps
+archive/
+core_nid*

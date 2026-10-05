@@ -94,6 +94,7 @@ class Run():
         set_args('taylor_measure', False)
         set_args('debiasing', False)
         set_args('hessian_type', None)
+        set_args('get_maxlkl', None) # None: derived from the method flags (see Inference.init); True/False: force the profiled / marginalized nuisance likelihood
         set_args('vectorize', False)
         set_args('emulate', None)
         set_args('taylor', False)
@@ -155,7 +156,7 @@ class Run():
             if samplers_options is None: samplers_options = len(samplers) * [{}]
             if type(samplers_options) == dict: samplers_options = [samplers_options]
             for sampler, options in zip(samplers, samplers_options):
-                self.I.set_sampler(sampler=sampler, cosmo_prior=self.c['cosmo_prior'], ext_probe=self.c['ext_probe'], ext_loglkl=self.c['ext_loglkl'], measure=self.c['measure'], taylor_measure=self.c['taylor_measure'], debiasing=self.c['debiasing'], hessian_type=self.c['hessian_type'], jax_jit=self.c['jax_jit'], vectorize=self.c['vectorize'], emulate=self.c['emulate'], taylor=self.c['taylor'], return_extras=return_extras, options=options, verbose=verbose)
+                self.I.set_sampler(sampler=sampler, cosmo_prior=self.c['cosmo_prior'], ext_probe=self.c['ext_probe'], ext_loglkl=self.c['ext_loglkl'], measure=self.c['measure'], taylor_measure=self.c['taylor_measure'], debiasing=self.c['debiasing'], hessian_type=self.c['hessian_type'], get_maxlkl=self.c['get_maxlkl'], jax_jit=self.c['jax_jit'], vectorize=self.c['vectorize'], emulate=self.c['emulate'], taylor=self.c['taylor'], return_extras=return_extras, options=options, verbose=verbose)
                 if verbose: print('sampling starts...')
                 toc = tic()                 # timing starts...
                 if return_extras: samples, free_param_name, extras = self.I.get_p(initial_pos=initial_pos, verbose=verbose)

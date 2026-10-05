@@ -77,7 +77,7 @@ class Fake():
         self.n_sky, self.cosmo, self.boltzmann, = n_sky, fiducial_cosmo, boltzmann
 
         with_emu = likelihood_config['with_emu'] if 'with_emu' in likelihood_config else False
-        if self.boltzmann == 'Symbolic' or with_emu: 
+        if self.boltzmann == 'Symbolic' or self.boltzmann == 'IEmu' or with_emu:
             self.jax_jit = True
             from pybird.config import set_jax_enabled
             set_jax_enabled(True)

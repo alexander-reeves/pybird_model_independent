@@ -168,6 +168,11 @@ class IntegratedModel:
             self.zero_columns = zero_columns
             self.rescaling_factor = rescaling_factor
             self.num_zero_columns = len(self.zero_columns) if self.zero_columns is not None else 0
+            if 'modes' in attr_group.keys():
+                self.modes = attr_group['modes'][()]
+            if 'param_names' in attr_group.keys():
+                self.param_names = [n.decode('utf-8') if isinstance(n, (bytes, bytearray)) else str(n)
+                                    for n in attr_group['param_names'][()]]
 
             if pca_components is not None:
                 self.pca = True

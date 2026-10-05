@@ -1,6 +1,7 @@
 from pybird.module import *
 from pybird.correlator import Correlator
 from pybird.io_pb import ReadWrite
+from pybird.symbolic import Symbolic
 import numpy as np
 import time
 
@@ -69,7 +70,7 @@ class Likelihood(object):
         get_chi2_for_hessian(): Compute chi-squared specifically for Hessian calculation.
         get_prior(): Compute log-prior for non-marginalized EFT parameters.
         get_alpha_bao_rec(): Calculate alpha parameters for BAO reconstruction.
-        set_bao_rec(): Add BAO reconstruction alphas to theory vector.
+        set_bao_rec(): Set up the post-reconstruction BAO block (alphas, analytic background).
         get_loop(): Calculate loop corrections and create appropriate precision matrix.
         
         loglkl(): Main method to compute log-likelihood for given parameters.
@@ -89,7 +90,19 @@ class Likelihood(object):
         self.correlator_sky = [Correlator(self.c_sky[i]) for i in range(self.nsky)] # skylist of PyBird correlator engine
         self.set_eft_parameters()
         self.set_boost()
-        if self.c["with_bao_rec"]: self.alpha_sky = [None] * self.nsky # skylist of bao recon alpha 
+        self.set_bao_rec()
+
+    def set_bao_rec(self):
+        """Post-reconstruction BAO: per-sky alpha slot, and the analytic background (Symbolic)
+        used when the Boltzmann engine does not provide r_d / D_H / D_M itself."""
+        if self.c["with_bao_rec"]:
+            self.alpha_sky = [None] * self.nsky   # skylist of bao recon alphas
+            self.S = Symbolic()                   # not compatible with every cosmology, beware!
+            def get_bao_distance(cosmo_dict, z):
+                self.S.set(cosmo_dict)
+                return self.S.get_bao_distance(z)
+            self.get_bao_distance = get_bao_distance
+        return
 
     def set_data(self):
         self.m_sky = [self.d_sky[i]['mask'] for i in range(self.nsky)] # mask for theory model
@@ -100,7 +113,7 @@ class Likelihood(object):
         self.out = [{} for i in range(self.nsky)]
 
     def set_config(self, verbose=True):
-        options = ['get_maxlkl', 'with_boss_correlated_skies_prior', 'with_rs_marg', 'drop_logdet', 'cache']
+        options = ['get_maxlkl', 'with_bao_rec', 'with_boss_correlated_skies_prior', 'with_rs_marg', 'drop_logdet', 'cache']
         if verbose: print ('-----------------------')
         for keys in options:
             if not keys in self.c: self.c[keys] = False
@@ -248,17 +261,30 @@ class Likelihood(object):
                 prior += _get_prior(array([b_sky[j][param] for j in range(self.nsky)]), self.bg_prior_mean[i], self.bg_prior_sigma[i], self.prior_inv_corr_matrix, prior_type='gauss')
         return prior
 
-    def get_alpha_bao_rec(self, class_engine, i_sky=0):
-        rd_by_rdfid = class_engine.rs_drag() / self.d_sky[i_sky]['bao_rec_fid']['rd']
-        DM_by_DMfid = class_engine.angular_distance(self.d_sky[i_sky]['z']) / self.d_sky[i_sky]['bao_rec_fid']['D']
-        H_by_Hfid = class_engine.Hubble(self.d_sky[i_sky]['z']) * c_light*1e-3 / self.d_sky[i_sky]['bao_rec_fid']['H']
-        alpha_par = 1. / (rd_by_rdfid * H_by_Hfid)
-        alpha_per = DM_by_DMfid / rd_by_rdfid
-        return array([alpha_par, alpha_per])
+    def get_alpha_bao_rec(self, cosmo_dict, cosmo_engine=None, cosmo_module='Symbolic', i_sky=0):
+        """Post-reconstruction BAO dilations of the model, relative to the fiducial stored in the
+        data file: alpha_par = (D_H/r_d) / (D_H/r_d)_fid, alpha_per = (D_M/r_d) / (D_M/r_d)_fid,
+        collapsed to alpha_iso = alpha_par^(1/3) alpha_per^(2/3) for the isotropic samples.
+        With cosmo_module=None the background distances are taken straight from the per-sky
+        cosmo_dict ('DH', 'DM', 'rd'), which is how a model-independent analysis supplies them."""
+        fid = self.d_sky[i_sky]['bao_rec_fid']
+        if cosmo_module is None: DH, DM, rd = cosmo_dict['DH'], cosmo_dict['DM'], cosmo_dict['rd']
+        elif cosmo_module == 'class':
+            DH, DM, rd = 1 / cosmo_engine.Hubble(fid['zeff']), (1+fid['zeff']) * cosmo_engine.angular_distance(fid['zeff']), cosmo_engine.rs_drag()
+        else:
+            if cosmo_module == 'Symbolic': c = cosmo_engine.c
+            elif cosmo_module in ['CPJ', 'CPJ_custom']: c = cosmo_engine.cosmo
+            else: c = cosmo_dict
+            DH, DM, rd = self.get_bao_distance(c, fid['zeff'])
+        alpha_par, alpha_per = DH / rd / fid['DH_over_rd_fid'], DM / rd / fid['DM_over_rd_fid']
+        if fid['iso']: return array([alpha_par**(1/3.) * alpha_per**(2/3.)]).reshape(-1)
+        else: return array([alpha_par, alpha_per]).reshape(-1)
 
-    def set_bao_rec(self, alphas, Tng_k, Tg_bk=None):
+    def concatenate_bao_rec(self, alphas, Tng_k, Tg_bk=None):
+        """Append the BAO alphas (1 or 2 per sky) to the theory vector; the analytic-marginalization
+        design matrix is zero-padded over them, so no EFT nuisance multiplies a BAO datapoint."""
         Tng_k = concatenate((Tng_k, alphas))
-        if Tg_bk is not None: Tg_bk = pad(Tg_bk, [(0, 0), (0, 2)], mode='constant', constant_values=0)
+        if Tg_bk is not None: Tg_bk = pad(Tg_bk, [(0, 0), (0, alphas.shape[0])], mode='constant', constant_values=0)
         return Tng_k, Tg_bk
 
     def get_loop(self, b_sky, sky='sky', i_sky=0, marg=False): 
@@ -331,7 +357,7 @@ class Likelihood(object):
                 for i in range(self.nsky):
                     cosmo_dict_i = cosmo_dict[i] if cosmo_dict is not None else None
                     self.correlator_sky[i].compute(cosmo_dict=cosmo_dict_i, cosmo_engine=cosmo_engine, cosmo_module=cosmo_module) 
-                    if self.c["with_bao_rec"]: self.alpha_sky[i] = self.get_alpha_bao_rec(cosmo_engine, i_sky=i)
+                    if self.c["with_bao_rec"]: self.alpha_sky[i] = self.get_alpha_bao_rec(cosmo_dict=cosmo_dict_i, cosmo_engine=cosmo_engine, cosmo_module=cosmo_module, i_sky=i)
 
         if self.marg_lkl:
             if True: 
@@ -339,7 +365,7 @@ class Likelihood(object):
                 for i in range(self.nsky):
                     Tng_k.append( self.correlator_sky[i].get(self.b_sky[i]).reshape(-1)[self.m_sky[i]] )
                     Tg_bk.append( self.correlator_sky[i].getmarg(self.b_sky[i], self.bg_name)[:, self.m_sky[i]] )
-                    if self.c["with_bao_rec"]: Tng_k[i], Tg_bk[i] = self.set_bao_rec(self.alpha_sky[i], Tng_k[i], Tg_bk[i])
+                    if self.c["with_bao_rec"]: Tng_k[i], Tg_bk[i] = self.concatenate_bao_rec(self.alpha_sky[i], Tng_k[i], Tg_bk[i])
                 _Tng_k, _Tg_bk, _p = [concatenate(Tng_k)-self.y_all], [block_diag(*Tg_bk)], [self.p_all]
             if self.c["with_loop_prior"]: 
                 Tng1_k, Tg1_bk, p0 = [], [], []
@@ -357,7 +383,7 @@ class Likelihood(object):
             chi2 = 0.
             for i, sky in enumerate(self.c['sky']):
                 Tng_k_i = self.correlator_sky[i].get(self.b_sky[i]).reshape(-1)[self.m_sky[i]] 
-                if self.c["with_bao_rec"]: Tng_k_i, _ = self.set_bao_rec(self.alpha_sky[i], Tng_k_i, None)
+                if self.c["with_bao_rec"]: Tng_k_i, _ = self.concatenate_bao_rec(self.alpha_sky[i], Tng_k_i, None)
                 if hessian_type is not None: chi2_i = self.get_chi2_for_hessian(Tng_k_i, self.p_sky[i], T_k_2=self.Tng_k_cache[i], hessian_type=hessian_type)
                 else:
                     chi2_i = self.get_chi2_non_marg(Tng_k_i-self.y_sky[i], self.p_sky[i])

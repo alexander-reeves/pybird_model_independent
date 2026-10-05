@@ -1,0 +1,162 @@
+% Parameter-recovery summary of the fiducial MI model Ag245F (DESI DR1 FS+BAO).
+% Build:  cd results && ~/.local/bin/tectonic Ag245F_parameter_recovery.tex
+% Figures: notebooks/desi_fsbao/wiggle_results_figs.py (WIGGLE=Ag245F) -> output/desi_fsbao/wiggle_figs/Ag245F/
+% Numbers: output/desi_fsbao/wiggle_Ag245F/recovery.log (2026-10-04), output/desi_fsbao/wiggle_Ag245/sample.log
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=2cm]{geometry}
+\usepackage{amsmath,amssymb,booktabs,graphicx,xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+\graphicspath{{../output/desi_fsbao/wiggle_figs/Ag245F/}}
+\setlength{\parindent}{0pt}\setlength{\parskip}{5pt}
+\newcommand{\fig}[2]{\begin{figure}[p]\centering\includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{#1}\caption{#2}\end{figure}\clearpage}
+\title{Model-independent analysis of DESI DR1 full shape + BAO:\\ parameter recovery with the BAO-template model \texttt{Ag245F}}
+\date{5 October 2026}
+\begin{document}
+\maketitle
+
+\section*{What is being tested}
+The model-independent (MI) analysis fits the DESI DR1 full-shape and BAO data with the linear power spectrum, the growth
+rate and the distances at each redshift as free parameters, instead of computing them from a cosmology. A cosmological
+model $\theta$ is then fitted by projecting the MI posterior onto it, with no new run of the EFT likelihood:
+\[
+p(\theta\,|\,d)\;\propto\;\frac{p_{\rm MI}\big(\phi(\theta)\,|\,d\big)}{\pi_{\rm MI}\big(\phi(\theta)\big)}\;\pi(\theta).
+\]
+\textbf{Test.} For four cosmologies we compare this projection with a \emph{direct} fit of the same data, made with the
+full EFT likelihood and the same priors. The projection passes if every parameter shifts by less than $0.3\sigma$ and every
+width agrees within 20\%. Here a shift is $(\bar x_{\rm MI}-\bar x_{\rm direct})/\sigma_{\rm direct}$ and a width ratio is
+$\sigma_{\rm MI}/\sigma_{\rm direct}$.
+
+\section*{Data and theory}
+DESI DR1 $P_0$, $P_2$ of BGS, LRG1--3, ELG2 and QSO ($z_{\rm eff}=0.295$--$1.491$), $0.02<k<0.20\,h\,{\rm Mpc}^{-1}$, with
+the survey window. Added to them are the 10 post-reconstruction BAO dilations, in one joint covariance: 442 data points.
+The theory is the pybird one-loop EFT (west-coast basis), IR-resummed and with AP, evaluated through the 80-knot loop
+emulator.
+
+\section*{The MI model}
+\[
+P_{\rm lin}(k,z_i)=\Big[\frac{D(z_i)}{D(z_N)}\Big]^2\,a(k)\,T_{\rm nw}(k)\,
+\Big[1+(1+A)\,e^{-k^2\Delta\Sigma^2/2}\,O(\alpha_{r_s}k)\Big],\qquad z_N=1.491 .
+\]
+\begin{itemize}\itemsep1pt
+\item $T_{\rm nw}$ and $O$: the no-wiggle part and the wiggle pattern of the fiducial (Planck 2018) linear spectrum.
+\item $a(k)$: a cubic spline in $\ln k$ on 21 nodes (spacing 0.44). That is too coarse to move a wiggle, so the BAO
+  position comes only from $\alpha_{r_s}$ and the dilations.
+\item $\alpha_{r_s}$, $A$, $\Delta\Sigma^2$: the sound-horizon rescaling, amplitude and damping of the wiggles, as in a BAO
+  template fit.
+\item Per redshift: $f(z_i)$, $D(z_i)/D(z_N)$, and $\alpha_\parallel$, $\alpha_\perp$ for the full-shape AP. The BAO
+  points are predicted as $\alpha/\alpha_{r_s}$, so there is no separate BAO dilation.
+\item $b_1$, $c_2$ per sample are sampled; the other 42 EFT coefficients are profiled analytically.
+\end{itemize}
+That makes 59 sampled parameters. The priors are $\ln\alpha_{r_s}\sim\mathcal N(0,0.05)$, $A\sim\mathcal N(0,0.3)$,
+$\Delta\Sigma^2\sim\mathcal N(0,25\,{\rm Mpc}^2)$, and $\ln f$, $\ln\alpha_{\parallel,\perp}\sim\mathcal N({\rm fid},0.3)$. The
+$\ln a$ shape has $\sigma=0.5$ per node plus a smoothness penalty, and the per-redshift amplitudes have $\sigma(\ln P)=0.6$.
+The full list is in \texttt{WIGGLE\_SETUP.md}, in the repository folder \texttt{notebooks/desi\_fsbao}.
+
+\textbf{MI chain:} NUTS, 32 chains $\times$ 2000 draws, max $\hat R=1.005$, min ESS 6405. Best-fit $\chi^2=284.2$
+for 442 points; the direct $\Lambda$CDM best fit has 332.3.
+
+\section*{Projection and reference}
+\begin{itemize}\itemsep1pt
+\item \textbf{$\phi(\theta)$:} for each $\theta$ it holds that cosmology's $f$, $D$, $\alpha_\parallel$, $\alpha_\perp$ and
+  $\alpha_{r_s}$.
+\item \textbf{$a(k)$, $A$, $\Delta\Sigma^2$:} they come from a least-squares fit of $\theta$'s linear spectrum on the 80
+  emulator knots, weighted by the data's Fisher information. This fit uses $\theta$ only, never the data, so the BAO
+  amplitude and damping are \emph{predicted} by the cosmology.
+\item \textbf{$p_{\rm MI}$:} an ensemble of 10 normalizing flows (RealNVP) trained on the MI chain.
+\item \textbf{Reference:} a direct NUTS chain of the \emph{true} likelihood for each cosmology. Its linear spectrum
+  (CosmoPower, or the ede-v2 emulator for EDE) goes to the same EFT, AP and BAO, with the same priors: flat boxes plus
+  $\omega_b\sim\mathcal N(0.02218,0.00055)$ (BBN) wherever $\omega_b$ is free.
+\end{itemize}
+
+\clearpage
+\section*{Result}
+\begin{center}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+cosmology & largest shift (flows) & width ratios (flows) & largest shift (Gaussian $p_{\rm MI}$) \\
+\midrule
+$\Lambda$CDM ($\omega_{\rm cdm}$, $A_s$, $h$) & $0.18\sigma$ & 0.97--1.03 & $0.18\sigma$ \\
+$\Lambda$CDM + $\omega_b$ (BBN), $n_s$ & $0.26\sigma$ & 0.97--1.02 & $0.25\sigma$ \\
+$w_0w_a$CDM & $0.20\sigma$ & 1.00--1.05 & $\mathbf{0.66\sigma}$ \\
+EDE ($n_s$ fixed) & $0.11\sigma$ & 0.96--1.02 & $0.19\sigma$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+All four pass with the flows. The Gaussian estimate misses $w_0w_a$CDM along $h$--$w_0$--$w_a$: the MI posterior is
+non-Gaussian there, because $\alpha_{r_s}$ and the dilations are nearly degenerate. The flows are therefore the default.
+
+\small
+\begin{center}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+cosmology & parameter & direct (true likelihood) & MI $\to$ cosmology & shift [$\sigma$] & width ratio \\
+\midrule
+$\Lambda$CDM & $\omega_{\rm cdm}$ & $0.1211\pm0.0048$ & $0.1203\pm0.0047$ & $-0.18$ & 0.97 \\
+ & $\ln10^{10}A_s$ & $3.024\pm0.092$ & $3.040\pm0.090$ & $+0.18$ & 0.98 \\
+ & $h$ & $0.6882\pm0.0061$ & $0.6879\pm0.0063$ & $-0.06$ & 1.03 \\
+\midrule
+$\Lambda$CDM, $\omega_b$, $n_s$ & $\omega_{\rm cdm}$ & $0.1162\pm0.0063$ & $0.1146\pm0.0061$ & $-0.26$ & 0.98 \\
+ & $\omega_b$ & $0.02206\pm0.00054$ & $0.02208\pm0.00053$ & $+0.02$ & 0.99 \\
+ & $n_s$ & $1.006\pm0.040$ & $1.014\pm0.039$ & $+0.18$ & 0.97 \\
+ & $\ln10^{10}A_s$ & $3.079\pm0.104$ & $3.106\pm0.103$ & $+0.26$ & 0.99 \\
+ & $h$ & $0.6850\pm0.0074$ & $0.6845\pm0.0075$ & $-0.08$ & 1.02 \\
+\midrule
+$w_0w_a$CDM & $\omega_{\rm cdm}$ & $0.1227\pm0.0079$ & $0.1214\pm0.0081$ & $-0.17$ & 1.03 \\
+ & $\omega_b$ & $0.02209\pm0.00053$ & $0.02210\pm0.00054$ & $+0.01$ & 1.01 \\
+ & $n_s$ & $0.971\pm0.045$ & $0.980\pm0.046$ & $+0.20$ & 1.01 \\
+ & $\ln10^{10}A_s$ & $2.852\pm0.173$ & $2.882\pm0.172$ & $+0.17$ & 1.00 \\
+ & $h$ & $0.667\pm0.021$ & $0.667\pm0.022$ & $+0.01$ & 1.05 \\
+ & $w_0$ & $-0.64\pm0.23$ & $-0.66\pm0.24$ & $-0.08$ & 1.05 \\
+ & $w_a$ & $-1.46\pm0.84$ & $-1.37\pm0.85$ & $+0.10$ & 1.01 \\
+\midrule
+EDE & $\omega_{\rm cdm}$ & $0.1374\pm0.0111$ & $0.1365\pm0.0112$ & $-0.09$ & 1.02 \\
+ & $\omega_b$ & $0.02224\pm0.00054$ & $0.02224\pm0.00054$ & $-0.00$ & 0.99 \\
+ & $\ln10^{10}A_s$ & $3.034\pm0.106$ & $3.045\pm0.102$ & $+0.11$ & 0.96 \\
+ & $h$ & $0.730\pm0.029$ & $0.729\pm0.030$ & $-0.03$ & 1.01 \\
+ & $f_{\rm EDE}$ & $0.152\pm0.087$ & $0.148\pm0.085$ & $-0.05$ & 0.98 \\
+ & $\log_{10}z_c$ & $3.54\pm0.41$ & $3.55\pm0.41$ & $+0.03$ & 1.00 \\
+ & $\theta_i$ & $1.55\pm0.86$ & $1.54\pm0.85$ & $-0.01$ & 0.99 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\normalsize
+
+\section*{Why $A$ and $\Delta\Sigma^2$ are predicted, not marginalized}
+Marginalizing $A$ and $\Delta\Sigma^2$ in the projection treats them as free nuisances of the cosmology fit, which throws
+away what the wiggle amplitude and damping say about $\omega_b$, $\omega_m$ and EDE. With them marginalized, the
+$\Lambda$CDM + $\omega_b$, $n_s$ widths grow by $\times1.24$ ($\omega_{\rm cdm}$) and $\times1.29$ ($n_s$). EDE shifts by
+$+0.37$ to $+0.44\sigma$ in $\omega_{\rm cdm}$, $h$ and $f_{\rm EDE}$ (Gaussian estimate). A direct true-likelihood fit with
+$A$, $\Delta\Sigma^2$ free shifts the same way, so this is lost information, not a bias of the method.
+
+On their own the data barely constrain them: $A=0.16\pm0.16$ and $\Delta\Sigma^2=7\pm21\,{\rm Mpc}^2$. $\Lambda$CDM
+predicts $A=-0.02\pm0.07$ and $\Delta\Sigma^2=-1.5\pm4.4\,{\rm Mpc}^2$, consistent with the data. Their correlation with
+every BAO dilation is $|r|\le0.10$, so the BAO position is carried by $\alpha/\alpha_{r_s}$ alone.
+
+\section*{Caveats}
+\begin{itemize}\itemsep1pt
+\item \textbf{$r_d$:} the $\omega_b$ exponent of pybird's analytic $r_d$ fit has the wrong sign ($+0.13$ instead of
+  $-0.13$). Every chain here uses the corrected fit.
+\item \textbf{$\Delta\Sigma^2$ prior:} at 25\,Mpc$^2$ it is wider than physical cosmologies need. A $\sim$10\,Mpc$^2$
+  prior, or setting $O$ to zero above the data range, would stop its negative tail from amplifying the wiggles at
+  $k\gtrsim0.3\,{\rm Mpc}^{-1}$.
+\item \textbf{Absolute amplitude:} the absolute linear amplitude is degenerate with $b_1$ (Fig.~\ref{fig:pk}); the
+  \emph{shape} of $P_{\rm lin}$ is what the data constrain.
+\end{itemize}
+\clearpage
+
+\fig{recovery_lcdm3.pdf}{$\Lambda$CDM ($\omega_{\rm cdm}$, $\ln10^{10}A_s$, $h$): direct true-likelihood posterior (filled)
+against the MI posterior projected onto $\Lambda$CDM (flow ensemble).}
+\fig{recovery_lcdm5.pdf}{$\Lambda$CDM with $\omega_b$ (BBN prior) and $n_s$ free.}
+\fig{recovery_w0wa7.pdf}{$w_0w_a$CDM.}
+\fig{recovery_ede7.pdf}{Early dark energy ($n_s$ fixed).}
+\begin{figure}[p]\centering\includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{pklin.pdf}
+\caption{\label{fig:pk}The reconstructed $P_{\rm lin}(k,z_N=1.491)$: MI posterior (68\% and 95\%) against the
+$\Lambda$CDM true-likelihood posterior (red, 68\%). Top: absolute; middle: ratio to the fiducial; bottom: shape (ratio
+normalized at $k=0.05\,{\rm Mpc}^{-1}$). Grey: the data range.}\end{figure}\clearpage
+\fig{mi_bao_alphas.pdf}{MI posterior of the BAO-equivalent dilations $\alpha/\alpha_{r_s}=(D/r_d)/(D/r_d)_{\rm fid}$ at the six
+redshifts, with the $\Lambda$CDM posterior mapped in.}
+\fig{mi_growth.pdf}{MI posterior of the growth rates $f(z)$ and the growth ratios $D(z)/D(z_N)$, with $\Lambda$CDM mapped in.}
+\fig{mi_wiggles.pdf}{MI posterior of $\alpha_{r_s}$, $A$, $\Delta\Sigma^2$, the amplitude at $z_N$ $\langle\ln a\rangle$ and the
+mean dilation $\langle\ln\alpha\rangle$, with $\Lambda$CDM mapped in (red).}
+
+\end{document}

@@ -260,6 +260,12 @@ class Correlator(object):
             "knots_path": Option("knots_path", str,
                 description="Path to emulator knots",
                 default=str((get_data_path() / "knots.npy").resolve())),
+            "cpj_pk_on_knots": Option("cpj_pk_on_knots", bool,
+                description="Internal CPJ Boltzmann only: evaluate the linear power spectrum directly on the emulator knots (kk = knots [h/Mpc], P(k) = P_Mpc(k h) h^3), so that no second interpolation happens inside the emulator. Default False: P(k) is returned on the CosmoPower native k grid.",
+                default=False),
+            "cpj_z_ref": Option("cpj_z_ref", float,
+                description="Internal CPJ Boltzmann only: if >= 0, evaluate CosmoPower at this reference redshift and rescale to the effective redshift z with the symbolic (scale-independent) growth factor, P(k, z) = P(k, z_ref) D(z)^2 / D(z_ref)^2. Default -1: evaluate CosmoPower at z directly.",
+                default=-1.),
         }
 
         if config_dict is not None: self.set(config_dict, load_engines=load_engines)

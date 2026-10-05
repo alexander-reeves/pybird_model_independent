@@ -112,8 +112,32 @@ class Inference():
                 def __init__(self, cosmo):
                     self.cosmo = cosmo # dictionary of cosmological parameters
             self.M = CosmoModule(self.l['cosmo'])
+        elif self.l['boltzmann'] == 'IEmu':
+            # Internal CLASS GR+w0wa P_lin emulator (ported from pybird_emu commit 05a92bd).
+            import os
+            from pybird.integrated_model_jax import IntegratedModel
+            class CosmoModule():
+                def __init__(self, cosmo):
+                    self.cosmo = cosmo
+            self.M = CosmoModule(self.l['cosmo'])
+            emu_path = self.L.c['emu_path'] if hasattr(self.L, 'c') and 'emu_path' in self.L.c else None
+            pklin_h5 = self.L.c['iemu_pklin_path'] if hasattr(self.L, 'c') and 'iemu_pklin_path' in self.L.c else None
+            if not pklin_h5:
+                if emu_path:
+                    cand = os.path.join(emu_path, 'pklin_gr_w0wa_class_jax_model.h5')
+                    if os.path.exists(cand):
+                        pklin_h5 = cand
+                if not pklin_h5:
+                    pklin_h5 = os.path.join(os.path.dirname(__file__), '..', 'data', 'emu', 'pklin_gr_w0wa_class_jax_model.h5')
+            self.M.pklin = IntegratedModel(None, None, None)
+            self.M.pklin.restore(pklin_h5)
+            if hasattr(self.M.pklin, 'modes'):
+                self.M.modes = array(self.M.pklin.modes)
+            else:
+                k_file = os.path.join(os.path.dirname(pklin_h5), 'pklin_gr_w0wa_class_k.npy')
+                self.M.modes = array(load(k_file)) if os.path.exists(k_file) else logspace(-5, 0, 512)
         else:
-            raise Exception('Boltzmann %s not recognized, please choose between class, Symbolic, or CPJ' % self.l['boltzmann'])
+            raise Exception('Boltzmann %s not recognized, please choose between class, Symbolic, CPJ, or IEmu' % self.l['boltzmann'])
 
         self.set_need_cosmo_update()
 
@@ -140,15 +164,16 @@ class Inference():
                 self.l['pos'] = {key: val for key, val in zip(name, pos)} # can be useful for another run (without tracing leakage from jitting over self.l['cosmo'] / self.l['nuisance'])
         return name, pos
 
-    def init(self, minimize=False, cosmo_prior=False, ext_probe=False, ext_loglkl=None, jax_jit=False, measure=False, taylor_measure=False, debiasing=False, hessian_type=None, vectorize=False, emulate: bool | None = None, taylor=False, order=3, verbose=True):
+    def init(self, minimize=False, cosmo_prior=False, ext_probe=False, ext_loglkl=None, jax_jit=False, measure=False, taylor_measure=False, debiasing=False, hessian_type=None, get_maxlkl=None, vectorize=False, emulate: bool | None = None, taylor=False, order=3, verbose=True):
         if vectorize or measure or taylor or emulate: jax_jit = True
         if not is_jax and jax_jit: raise Exception('To jit, switch to jax-mode!')
         if measure and debiasing: raise Exception('Can\'t apply measure and debiasing at the same time, choose one!')
         if (measure or debiasing) and hessian_type is None: raise Exception('Asking \'measure\' or \'debiasing\', please choose between \'hessian_type\' = \'H\', \'F\', or \'FH\'')
         if emulate is not None: self.set_emu(emulate, verbose=verbose) # if emulate = None (left unspecified), emulator option is set by likelihood_config['with_emu']; else (if specified), re-set correlator classes accordingly
         if taylor: self.set_taylor(self._get_bird_correlator, bird_correlator=True, log_measure=False, order=order, verbose=verbose)
-        if self.L.marg_lkl: 
-            if (minimize or measure or debiasing): self.L.c["get_maxlkl"] = True # equivalent as dropping the logdet on the nuisance subspace, however simplifying the implementation of the residual measure / debiasing on the nuisance-projected cosmo subspace
+        if self.L.marg_lkl:
+            if get_maxlkl is not None: self.L.c["get_maxlkl"] = get_maxlkl # explicit override: lets one sample the max-lkl (profiled) posterior on its own, e.g. as the un-shifted baseline the debiasing correction is a constant translation of
+            elif (minimize or measure or debiasing): self.L.c["get_maxlkl"] = True # equivalent as dropping the logdet on the nuisance subspace, however simplifying the implementation of the residual measure / debiasing on the nuisance-projected cosmo subspace
             else: self.L.c["get_maxlkl"] = False # flat measure
         free_param_name, initial_pos = self.get_param_name_and_pos(verbose=verbose)
         get_logp = self.set_logp(cosmo_prior=cosmo_prior, ext_probe=ext_probe, ext_loglkl=ext_loglkl, jax_jit=jax_jit, measure=measure, hessian_type=hessian_type, taylor_measure=taylor_measure, vectorize=vectorize, taylor=taylor)
@@ -160,7 +185,7 @@ class Inference():
             self.set_taylor(_logm, bird_correlator=False, log_measure=True, order=1, verbose=verbose)
         return get_logp, initial_pos, free_param_name 
 
-    def set_sampler(self, sampler='emcee', cosmo_prior=False, ext_probe=False, ext_loglkl=None, jax_jit=False, measure=False, taylor_measure=False, debiasing=False, hessian_type=None, vectorize=False, emulate: bool | None = None, taylor=False, order=3, return_extras=False, options={}, verbose=True):
+    def set_sampler(self, sampler='emcee', cosmo_prior=False, ext_probe=False, ext_loglkl=None, jax_jit=False, measure=False, taylor_measure=False, debiasing=False, hessian_type=None, get_maxlkl=None, vectorize=False, emulate: bool | None = None, taylor=False, order=3, return_extras=False, options={}, verbose=True):
         
         if verbose: print("----- sampling with %s -----" % sampler)
         if vectorize and sampler not in ['emcee', 'zeus']: 
@@ -186,7 +211,7 @@ class Inference():
                 if verbose: print ('warning: debiasing irrelevant in fisher; switching off')
                 debiasing = False
 
-        get_logp, _initial_pos, free_param_name = self.init(minimize=False, cosmo_prior=cosmo_prior, ext_probe=ext_probe, ext_loglkl=ext_loglkl, jax_jit=jax_jit, measure=measure, taylor_measure=taylor_measure, debiasing=debiasing, hessian_type=hessian_type, vectorize=vectorize, emulate=emulate, taylor=taylor, order=order, verbose=verbose)
+        get_logp, _initial_pos, free_param_name = self.init(minimize=False, cosmo_prior=cosmo_prior, ext_probe=ext_probe, ext_loglkl=ext_loglkl, jax_jit=jax_jit, measure=measure, taylor_measure=taylor_measure, debiasing=debiasing, hessian_type=hessian_type, get_maxlkl=get_maxlkl, vectorize=vectorize, emulate=emulate, taylor=taylor, order=order, verbose=verbose)
         n = len(free_param_name)
 
         if sampler == 'fisher':
@@ -204,22 +229,48 @@ class Inference():
             import emcee
             from numpy.random import randn, multivariate_normal
             if verbose and vectorize: print("emcee: vectorized")
-            def _get_p(initial_pos=None, num_samples=4000*n, discard=1000*n//4, thin=20*n, n_walkers=4*n, verbose=verbose):
+            def _get_p(initial_pos=None, num_samples=4000*n, discard=1000*n//4, thin=20*n, n_walkers=4*n, backend=None, resume=True, verbose=verbose):
                 if initial_pos is None: initial_pos = _initial_pos
-                if self.is_fisher: 
-                    if verbose: print ('Fisher matrix found: drawing initial conditions from multivariate normal')
-                    self.pos = multivariate_normal(initial_pos, self.C_fisher, size=n_walkers)
-                else: self.pos = initial_pos + 1e-4 * array(randn(n_walkers, len(initial_pos)))
-                self.nwalkers, self.ndim = self.pos.shape
-                sampler = emcee.EnsembleSampler(self.nwalkers, self.ndim, get_logp, vectorize=vectorize)
-                sampler.run_mcmc(self.pos, num_samples, progress = verbose)
+                # Optional emcee HDF backend: checkpoints the full sampler state each step so a
+                # run can be genuinely resumed/extended. backend=None -> in-memory (legacy behaviour).
+                import os
+                emcee_backend, start_pos, n_more, seed_pos = None, None, int(num_samples), None
+                if backend is not None:
+                    emcee_backend = emcee.backends.HDFBackend(backend)
+                    done = int(emcee_backend.iteration) if (resume and os.path.exists(backend)) else 0
+                    if done > 0:
+                        # EXTEND: seed a FRESH sampler from the previous run's last walker positions
+                        # (skips burn-in). emcee's native resume-into-a-populated-backend is broken with
+                        # vectorize=True (it jit-traces the log-prob at the wrong shape), so we reset the
+                        # backend and re-seed instead. The previous run's samples live in its output .h5;
+                        # concatenate for the full chain. Runs num_samples fresh steps.
+                        seed_pos = emcee_backend.get_chain()[-1]  # (nwalkers, ndim), plain numpy from emcee
+                        if verbose: print('emcee backend: extending -- seeding %d walkers from last state of %s, running %d fresh steps'
+                                          % (seed_pos.shape[0], backend, int(num_samples)))
+                if seed_pos is not None:
+                    self.pos = seed_pos
+                    self.nwalkers, self.ndim = self.pos.shape
+                else:
+                    # fresh run: initialise walkers
+                    if self.is_fisher:
+                        if verbose: print ('Fisher matrix found: drawing initial conditions from multivariate normal')
+                        self.pos = multivariate_normal(initial_pos, self.C_fisher, size=n_walkers)
+                    else: self.pos = initial_pos + 1e-4 * array(randn(n_walkers, len(initial_pos)))
+                    self.nwalkers, self.ndim = self.pos.shape
+                if emcee_backend is not None:
+                    emcee_backend.reset(self.nwalkers, self.ndim)  # always start the backend fresh (avoids the vectorized-resume bug)
+                    if verbose: print('emcee backend: checkpointing to %s' % backend)
+                start_pos = self.pos
+                sampler = emcee.EnsembleSampler(self.nwalkers, self.ndim, get_logp, vectorize=vectorize, backend=emcee_backend)
+                if n_more > 0:
+                    sampler.run_mcmc(start_pos, n_more, progress = verbose)
                 extras = {'emcee_sampler': sampler}
                 tau = array(sampler.get_autocorr_time(c=thin, quiet=True))
-                if verbose: 
+                if verbose:
                     with printoptions(precision=0): print('autocorr time: ', tau)
-                extras['tau'] = tau 
+                extras['tau'] = tau
                 flat_samples = sampler.get_chain(discard = discard, thin = thin, flat = True)
-                
+
                 return flat_samples, extras
 
         elif sampler == 'zeus':
@@ -686,7 +737,7 @@ class Inference():
 
         toc = tic() 
         if bird_correlator: _, size_per_sky = f(x0, return_size_per_sky=True)
-        if self.l['boltzmann'] in ['Symbolic', 'CPJ', 'CPJ_custom']: # JAX-differentiable Boltzmann code
+        if self.l['boltzmann'] in ['Symbolic', 'CPJ', 'CPJ_custom', 'IEmu']: # JAX-differentiable Boltzmann code
             def make_jacfwd_chain(f, max_order):
                 chain = [f]
                 for _ in range(max_order): chain.append(jacfwd(chain[-1]))
@@ -767,11 +818,13 @@ class Inference():
             self.M.compute()
         elif self.l['boltzmann'] == 'Symbolic':
             self.M.set(cosmo)
-        elif self.l['boltzmann'] == 'CPJ': 
-            self.M.cosmo = cosmo 
-        elif self.l['boltzmann'] == 'CPJ_custom': 
-            self.M.cosmo = cosmo 
-        else: 
+        elif self.l['boltzmann'] == 'CPJ':
+            self.M.cosmo = cosmo
+        elif self.l['boltzmann'] == 'CPJ_custom':
+            self.M.cosmo = cosmo
+        elif self.l['boltzmann'] == 'IEmu':
+            self.M.cosmo = cosmo
+        else:
             pass
         return
 

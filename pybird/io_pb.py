@@ -142,7 +142,8 @@ class ReadWrite(object):
     def config(self, c, fd_sky):
         options_for_correlator = ["output", "multipole", "km", "kr", "nd", "with_emu", "with_resum", "fftaccboost",
                                   "eft_basis", "with_stoch", "with_nnlo_counterterm", "with_time", "with_exact_time",
-                                  "with_ap", "with_survey_mask", "with_binning", "with_wedge", "with_redshift_bin"]
+                                  "with_ap", "with_survey_mask", "with_binning", "with_wedge", "with_redshift_bin",
+                                  "cpj_pk_on_knots", "cpj_z_ref"]
 
         fc_sky = [] # skylist of formatted config dict for Correlator
 
@@ -204,8 +205,12 @@ class ReadWrite(object):
 
             if c['with_bao_rec']: 
                 fdata['bao_rec_fid'] = d['bao_rec']['fid']
-                fdata['y'] = concatenate((fdata['y'], array([d['bao_rec']['alpha']['par'], d['bao_rec']['alpha']['per']])))
-                cmask = concatenate((cmask, array([-2, -1]))) 
+                if fdata['bao_rec_fid']['iso']:   # isotropic sample: a single alpha_iso datapoint
+                    fdata['y'] = concatenate((fdata['y'], array([d['bao_rec']['alpha']['iso']])))
+                    cmask = concatenate((cmask, array([-1])))
+                else:
+                    fdata['y'] = concatenate((fdata['y'], array([d['bao_rec']['alpha']['par'], d['bao_rec']['alpha']['per']])))
+                    cmask = concatenate((cmask, array([-2, -1])))
                 cross_fs_alpha = d['bao_rec']['cov']['cross-%s' % c['output']]
                 cov_alpha = d['bao_rec']['cov']['alpha']
                 cov = block([[cov, cross_fs_alpha], [cross_fs_alpha.T, cov_alpha]])

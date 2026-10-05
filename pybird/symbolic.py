@@ -14,13 +14,22 @@ def f(Om,z,w0=-1.,wa=0.,lcdm=False):
     else: return (Om*(5*a - 3*_D(Om,a,-1,0)))/(2.*(a**3*(1 - Om) + Om)*_D(Om,a,-1,0)) # LCDM only!
 
 def Hubble(Om,z,w0=-1.,wa=0.): return ((Om)*(1+z)**3.+(1-Om)*(1+z)**(3.*(1.+w0+wa))*exp(-3.*wa*z/(1.+z)))**0.5
-def DA(Om,z,w0=-1.,wa=0.):
-    zz = linspace(1e-5, z, num=30, endpoint=True)
+def DA(Om,z,w0=-1.,wa=0., zz=None):
+    if zz is None: zz = linspace(1e-5, z, num=30, endpoint=True)
     return trapz(1/Hubble(Om,zz,w0,wa), x=zz) / (1+z)
+
+# ---- background distances for the post-reconstruction BAO observables (ported from pybird-milan)
+c_light = 299792.458
+def comoving_distance(Om, z, w0=-1., wa=0.): # result in Mpc/h
+    zz = geomspace(1e-3, z, num=200, endpoint=True)
+    return c_light/100. * (1+z) * DA(Om, z, w0=w0, wa=wa, zz=zz)
+
+def rs_drag(h=0.68, omega_m=0.1432, omega_b=0.02236, Neff=3.046): # 2404.03002, eq. (2.5)
+    return 147.05 * (omega_m/0.1432)**-0.23 * (Neff/3.04)**-0.1 * (omega_b/0.02236)**0.13 * h # in Mpc/h
 
 class Symbolic():
     def __init__(self, max_precision=False, smooth_de=True):
-        self.cosmo_name = ['omega_b', 'omega_cdm', 'h', 'ln10^{10}A_s', 'n_s', 'Omega_b', 'Omega_m', 'A_s', 'sigma_8', 'm_ncdm', 'w0_fld', 'wa_fld']
+        self.cosmo_name = ['omega_b', 'omega_cdm', 'h', 'ln10^{10}A_s', 'n_s', 'H0', 'Omega_b', 'Omega_m', 'A_s', 'sigma_8', 'm_ncdm', 'w0_fld', 'wa_fld']
         self.max_precision, self.smooth_de = max_precision, smooth_de
 
     def set(self, cosmo):
@@ -32,12 +41,20 @@ class Symbolic():
         if 'm_ncdm' not in self.c: self.c['m_ncdm'] = 0.
         if 'w0_fld' not in self.c: self.c['w0_fld'] = -1.
         if 'wa_fld' not in self.c: self.c['wa_fld'] = 0.
+        if 'h' not in self.c: self.c['h'] = self.c['H0'] / 100.
         if 'Omega_b' not in self.c: self.c['Omega_b'] = self.c['omega_b'] / self.c['h']**2
         if 'Omega_m' not in self.c: self.c['Omega_m'] = (self.c['omega_cdm'] + self.c['omega_b'] + self.c['m_ncdm']/93.14) / self.c['h']**2
         if 'sigma_8' not in self.c: 
             if 'A_s' not in self.c: self.c['A_s'] = 1e-10 * exp(self.c['ln10^{10}A_s']) 
             self.c['sigma_8'] = sqrt(1e9) * As_to_sigma8(*(self.c[key] for key in ['A_s', 'Omega_m', 'Omega_b', 'h', 'n_s', 'm_ncdm', 'w0_fld', 'wa_fld']), max_precision=self.max_precision)
         return
+
+    def get_bao_distance(self, z):
+        """(D_H, D_M, r_d) in Mpc/h at redshift z, for the post-reconstruction BAO alphas."""
+        self.DH = c_light / (100.*Hubble(self.c['Omega_m'], z, self.c['w0_fld'], self.c['wa_fld']))
+        self.DM = comoving_distance(self.c['Omega_m'], z, self.c['w0_fld'], self.c['wa_fld'])
+        self.rd = rs_drag(h=self.c['h'], omega_m=self.c['Omega_m'] * self.c['h']**2, omega_b=self.c['omega_b'])
+        return self.DH, self.DM, self.rd
 
     def compute(self, k, z, emulator='fiducial'): 
         self.k, self.z = k, z

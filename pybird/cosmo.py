@@ -178,15 +178,33 @@ class Cosmo():
                 print("the input dict did not build... probably you are missing some of the required cosmo inputs for the emu")
                 print("exception:", e) 
             
-            input_dict_pk["z"] = array([self.c["z"]]) 
-            
-            cosmo["pk_lin"] = array(to_Mpc_per_h_jax(M.predict(input_dict_pk), M.modes, cosmo_dict_local["h"]))
-            cosmo["kk"] = array(M.modes)
-
-            ### using LCDM growths and distances for now (until growth emulator is debugged)
-            from pybird.symbolic import DA, Hubble, f
+            from pybird.symbolic import DA, Hubble, f, D as D_sym
 
             Omega_m = (cosmo_dict_local["omega_cdm"] + cosmo_dict_local["omega_b"]) / cosmo_dict_local["h"]**2
+            h_loc = cosmo_dict_local["h"]
+
+            # Optional reference-redshift evaluation: P(k, z) = P(k, z_ref) D(z)^2 / D(z_ref)^2 (symbolic LCDM growth)
+            z_ref = self.c["cpj_z_ref"] if "cpj_z_ref" in self.c else -1.
+            if z_ref is not None and z_ref >= 0.:
+                input_dict_pk["z"] = array([z_ref])
+                growth_resc = (D_sym(Omega_m, self.c["z"]) / D_sym(Omega_m, z_ref))**2
+            else:
+                input_dict_pk["z"] = array([self.c["z"]])
+                growth_resc = 1.
+
+            pk_mpc = M.predict(input_dict_pk)  # Mpc^3 on M.modes [1/Mpc]
+
+            # Optional evaluation on the emulator knots: P_h(k_h) = P_Mpc(k_h h) h^3 at k_h = knots
+            if "cpj_pk_on_knots" in self.c and self.c["cpj_pk_on_knots"]:
+                knots = array(load(self.c["knots_path"]))  # h/Mpc
+                # linear log-log interpolation from the dense CosmoPower grid (same as jnp.interp)
+                cosmo["pk_lin"] = growth_resc * exp(interp(log(knots * h_loc), log(array(M.modes)), log(pk_mpc))) * h_loc**3
+                cosmo["kk"] = knots
+            else:
+                cosmo["pk_lin"] = growth_resc * array(to_Mpc_per_h_jax(pk_mpc, M.modes, h_loc))
+                cosmo["kk"] = array(M.modes)
+
+            ### using LCDM growths and distances for now (until growth emulator is debugged)
 
             cosmo["f"] = f(Omega_m, self.c["z"])
             cosmo["H"], cosmo["DA"] = Hubble(Omega_m, self.c["z"]), DA(Omega_m, self.c["z"])
@@ -267,8 +285,82 @@ class Cosmo():
             cosmo['pk_lin'] = get_pk_lin_from_cpj_custom(engine.cosmo, kk, z)
             H, DA, f = get_growth(engine.cosmo, z)
             cosmo["H"], cosmo["DA"], cosmo["f"] = H, DA, f
-        
-        elif module is None: 
+
+        elif self._is(module, 'IEmu'):
+            # Internal CLASS GR+w0wa P_lin emulator (Flax export of UPanda-trained model).
+            # Ported from pybird_emu commit 05a92bd. Emulates the FULL w0wa linear P(k)
+            # directly over a wide box (w0[-2.1,0.4], wa[-3.6,1.0], ...); growth/AP from
+            # the Symbolic analytic helpers. The training log-preprocess is inverted HERE
+            # (not inside IntegratedModel.predict) so other emulators are unaffected.
+            from pybird.symbolic import D as D_sym, f as f_sym, Hubble as H_sym, DA as DA_sym
+
+            if not engine:
+                import os
+                from pybird.integrated_model_jax import IntegratedModel
+                cosmo_dict_local = cosmo_dict.copy()
+                pklin_h5 = self.c['iemu_pklin_path'] if 'iemu_pklin_path' in self.c else None
+                if not pklin_h5:
+                    emu_path = self.c['emu_path'] if 'emu_path' in self.c else ''
+                    cand = os.path.join(emu_path, 'pklin_gr_w0wa_class_jax_model.h5')
+                    if emu_path and os.path.exists(cand):
+                        pklin_h5 = cand
+                    else:
+                        pklin_h5 = os.path.join(os.path.dirname(__file__), '..', 'data', 'emu', 'pklin_gr_w0wa_class_jax_model.h5')
+                M_pk = IntegratedModel(None, None, None)
+                M_pk.restore(pklin_h5)
+                if hasattr(M_pk, 'modes'):
+                    modes = array(M_pk.modes)
+                else:
+                    k_file = os.path.join(os.path.dirname(pklin_h5), 'pklin_gr_w0wa_class_k.npy')
+                    modes = array(load(k_file)) if os.path.exists(k_file) else logspace(-5, 0, 512)
+            else:
+                M_pk, cosmo_dict_local, modes = engine.pklin, engine.cosmo, engine.modes
+
+            c = cosmo_dict_local
+            h = c['h']
+            m_nu = c['m_ncdm'] if 'm_ncdm' in c else (c['m_nu'] if 'm_nu' in c else 0.)
+            w0 = c['w0_fld'] if 'w0_fld' in c else (c['w0'] if 'w0' in c else -1.)
+            wa = c['wa_fld'] if 'wa_fld' in c else (c['wa'] if 'wa' in c else 0.)
+            if 'Omega_b' in c:
+                Omega_b = c['Omega_b']
+            else:
+                Omega_b = c['omega_b'] / h**2
+            if 'Omega_m' in c:
+                Omega_m = c['Omega_m']
+            else:
+                Omega_m = (c['omega_cdm'] + c['omega_b'] + m_nu / 93.14) / h**2
+            if 'A_s' in c:
+                A_s_1e9 = c['A_s'] * 1e9
+            else:
+                A_s_1e9 = exp(c['ln10^{10}A_s']) / 10.
+
+            z = self.c['z']
+            # UPanda training order: A_s_1e9, Omega_m, Omega_b, h, n_s, m_nu, w0, wa, a
+            x = stack([
+                array([A_s_1e9]),
+                array([Omega_m]),
+                array([Omega_b]),
+                array([h]),
+                array([c['n_s']]),
+                array([m_nu]),
+                array([w0]),
+                array([wa]),
+                array([1. / (1. + z)]),
+            ], axis=1)
+
+            pk_pred = M_pk.predict(x)[0]
+            if getattr(M_pk, 'log_preprocess', False):
+                pk_pred = exp(pk_pred) + 2. * M_pk.offset   # invert training log-preprocess -> P(k) [(Mpc/h)^3]
+            cosmo['pk_lin'] = array(pk_pred)
+            cosmo['kk'] = array(modes)
+
+            cosmo['D'], cosmo['f'] = D_sym(Omega_m, z, w0, wa), f_sym(Omega_m, z, w0, wa)
+            if self.c["with_ap"]:
+                cosmo['H'], cosmo['DA'] = H_sym(Omega_m, z, w0, wa), DA_sym(Omega_m, z, w0, wa)
+
+            return cosmo
+
+        elif module is None:
             # no cosmo module -assume you have already input your required pk_lin 
             cosmo = cosmo_dict
 
