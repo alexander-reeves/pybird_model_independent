@@ -179,10 +179,24 @@ cython_debug/
 media
 static
 output/
-data/
+# data/: only the DESI DR1 FS+BAO likelihood and three small inputs of the MI pipeline are committed. The chains and products
+# the notebooks read (data/mi_chains*/, ~200 MB) are distributed as a zip: see notebooks/README.md
+data/*
+!data/desi_dr1_fs_bao/
+!data/mi_chains/
+data/mi_chains/*
+!data/mi_chains/knot_fisher.npz
+!data/mi_chains/theta_s_poly.npz
+!data/mi_chains/planck_early_lcdm_samples.npz
 __pycache__/
 *.pyc
 
 # local-only: superseded material (moved, not deleted) and SLURM core dumps
 archive/
 core_nid*
+# temporary code snapshot used by running jobs (2026-10-13 cleanup)
+notebooks/.mi_*/
+
+# the overview talk (presentation/README.md): local venv and logs
+presentation/.venv/
+presentation/logs/

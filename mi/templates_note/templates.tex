@@ -1,0 +1,32 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{amsmath,amssymb,xcolor}
+\usepackage[T1]{fontenc}
+\definecolor{ag}{HTML}{00897B}
+\definecolor{bt}{HTML}{6A1B9A}
+\setlength{\parindent}{0pt}\setlength{\parskip}{6pt}
+\pagestyle{empty}
+\begin{document}
+
+{\large\bfseries Linear $P(k)$ templates at $z_N=1.491$}
+
+\bigskip
+{\color{ag}\bfseries agnostic}
+\[
+P_{\rm lin}(k)\;=\;\underbrace{a(k)}_{\ln a_j,\ \ j=1,\dots,60}\;T(k)
+\]
+Varied: 60 node values $\ln a_j$ (cubic spline in $\ln k$, spacing 0.15, $k\in[10^{-4},0.7]\ h/{\rm Mpc}$).\\
+Fixed: fiducial spectrum $T(k)$.
+
+\bigskip\bigskip
+{\color{bt}\bfseries bao\_template}
+\[
+P_{\rm lin}(k)\;=\;\underbrace{a(k)}_{\ln a_j,\ \ j=1,\dots,21}\;T_{\rm nw}(k)\,\Big[\,1\;+\;
+\underbrace{(1+A)}_{\text{BAO amplitude}}\;
+\underbrace{e^{-k^2\Delta\Sigma^2/2}}_{\text{BAO damping}}\;
+O\big(\underbrace{\alpha_{rs}}_{\text{BAO position}}\,k\big)\Big]
+\]
+Varied: 21 node values $\ln a_j$ (spacing 0.45), $A$, $\Delta\Sigma^2$, $\alpha_{rs}=h r_d/(h r_d)_{\rm fid}$.\\
+Fixed: fiducial no-wiggle spectrum $T_{\rm nw}(k)$ and fiducial BAO wiggles $O(k)$, with $T=T_{\rm nw}(1+O)$.
+
+\end{document}

@@ -9,7 +9,7 @@
 [![](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](https://github.com/pierrexyz/pybird/blob/master/LICENSE)
 [![](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://pierrexyz.github.io/pybird/)
 
-> **Model-independent EFTofLSS (this fork):** the MI analysis of DESI DR1 full shape + BAO is in [`notebooks/desi_fsbao/`](notebooks/desi_fsbao/README.md) (fiducial model `Ag245F`; parameter-recovery summary [`results/Ag245F_parameter_recovery.pdf`](results/Ag245F_parameter_recovery.pdf)), and the P(k) vs P(k)+B(k) Fisher forecasts are in [`notebooks/fisher/`](notebooks/fisher/README.md). Start at [`notebooks/README.md`](notebooks/README.md).
+> **Model-independent EFTofLSS (this fork):** the linear P(k), the growth and the distances are fitted freely to DESI DR1 full shape + BAO, and that model-independent posterior is projected onto ΛCDM, w0waCDM, EDE and the neutrino mass; plus a P(k) vs P(k)+B(k) Fisher forecast. The pipeline is in [`mi/`](mi/README.md), the notebooks in [`notebooks/`](notebooks/README.md). The chains the notebooks read are not in git: see [`notebooks/README.md`](notebooks/README.md#getting-the-chains).
 
 ## General info
 #### Fast correlator computation

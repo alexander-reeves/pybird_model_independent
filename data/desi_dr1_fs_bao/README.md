@@ -11,5 +11,5 @@ holds the window matrices and the 10 post-reconstruction BAO dilations, with one
   values therefore differ slightly from the BAO paper's tables of statistical-only posterior means.
 
 `likelihood_config/desi_dr1_fs_bao.yaml` is DESI's key-project configuration (`pybird-milan/data/desi_dr1/
-likelihood_config_v1/ALL.yaml`) with two edits: `with_emu: True` and an absolute `data_path`. `notebooks/desi_fsbao/
-settings.py` overrides that path with this folder.
+likelihood_config_v1/ALL.yaml`) with two edits: `with_emu: True` and an absolute `data_path`. `mi/config.py`
+(`load_data`) overrides that path with this folder.
